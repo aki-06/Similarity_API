@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 from flask_restful import Api, Resource
 from pymongo import MongoClient
 import bcrypt
+import spacy
 
 
 app = Flask(__name__)
@@ -43,4 +44,84 @@ class Register(Resource):
             "status": 200,
             "msg": "You've successfully signed up to the API"
         }
+        return jsonify(retJson)
+
+
+def verify_pw(username, password):
+    if not user_exist(username):
+        return False
+    
+    hashed_pw = users.find({
+        "Username": username
+    })[0]["Password"]
+    
+    if bcrypt.hashpw(password.encode('utf8'), hashed_pw) == hashed_pw:
+        return True
+    else:
+        return False
+
+
+def count_tokens(username):
+    tokens = users.find({
+        "Username": username
+    })[0]["Tokens"]
+    
+    return tokens
+
+class Detect(Resource):
+    def post(self):
+        postData = request.get_json()
+        
+        username = postData['username']
+        password = postData['password']
+        text1 = postData['text1']
+        text2 = postData['text2']
+        
+        if user_exist(username):
+            retJson = {
+                "status": 301,
+                "msg": "Invalid Username"
+            }
+            return jsonify(retJson)
+        
+        correct_pw = verify_pw(username, password)
+        
+        if not correct_pw:
+            retJson = {
+                "status": 302,
+                "msg": "Invalid Password"
+            }
+            
+        num_tokens = count_tokens(username)
+        
+        if num_tokens <= 0:
+            retJson = {
+                "status": 303,
+                "msg": "You're out of tokens, please refill"
+            }
+            return jsonify(retJson)
+        
+        nlp = spacy.load('en_core_web_sm')
+        
+        text1 = nlp(text1)
+        text2 = nlp(text2)
+        
+        ratio = text1.similarity(text2)
+        
+        retJson = {
+            "status": 200,
+            "similarity": ratio,
+            "msg": "Similarity score calculated successfully"
+        }
+        
+        current_tokens = count_tokens(username)
+        
+        users.update({
+            "Username": username,
+        },{
+            "$set": {
+                "Tokens": current_tokens - 1
+            }
+        })
+        
         return jsonify(retJson)
