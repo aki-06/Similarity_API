@@ -77,7 +77,7 @@ class Detect(Resource):
         text1 = postData['text1']
         text2 = postData['text2']
         
-        if user_exist(username):
+        if not user_exist(username):
             retJson = {
                 "status": 301,
                 "msg": "Invalid Username"
@@ -125,3 +125,51 @@ class Detect(Resource):
         })
         
         return jsonify(retJson)
+    
+    
+class Refill(Resource):
+    def post(self):
+        postData = request.get_json()
+        
+        username = postData["username"]
+        password = postData["password"]
+        
+        refill_amount = postData["refill"]
+        
+        if user_exist(username):
+            retJson = {
+                "status": 301,
+                "msg": "Invalid Username"
+            }
+            return jsonify(retJson)
+        
+        correct_pw = "abc123"
+        if not password == correct_pw:
+            retJson = {
+                "status": 304,
+                "msg": "Invalid Admin Password"
+            }
+            return jsonify(retJson)
+        
+        current_tokens = count_tokens(username)
+        users.update({
+            "Username": username
+        },{
+            "$set": {
+                "Tokens": refill_amount
+            }
+        })
+        
+        retJson = {
+            "status": 200,
+            "msg": "Refilled successfully"
+        }
+        
+        return jsonify(retJson)
+    
+api.add_resource(Register, '/register')
+api.add_resource(Detect, '/detect')
+api.add_resource(Refill, '/refill')
+
+if __name__ == "__main__":
+    app.run(host='0.0.0.0')
